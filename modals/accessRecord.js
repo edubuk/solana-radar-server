@@ -19,6 +19,10 @@ const accessRecordSchema = new mongoose.Schema({
             pinataHash: {
                 type: String,
                 required: true
+            },
+            accessFlag:{
+                type:Boolean,
+                required:true
             }
         }
     ]

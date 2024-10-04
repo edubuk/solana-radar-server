@@ -7,49 +7,36 @@ export const shareAccess = async (req, res) => {
     try {
         const { email, name, userId, pinataHash } = req.body;
 
-        // Ensure userId and pinataHash are provided
-        if (!userId || !pinataHash) {
-            return res.status(400).send({
-                success: false,
-                message: "userId and pinataHash are required"
-            });
-        }
-
         // Find the user by email
         let userRecord = await accessRecord.findOne({ email });
 
         if (userRecord) {
-            // Check if the userId and pinataHash combination already exists
-            const existingAccess = userRecord.accessData.find(
-                (access) => access.userId === userId && access.pinataHash === pinataHash
-            );
+            // Check if this pinataHash already exists in accessData
+            const existingAccess = userRecord.accessData.find(access => access.pinataHash === pinataHash);
 
             if (existingAccess) {
-                return res.status(400).send({
-                    success: false,
-                    message: "Access for this userId and pinataHash already exists"
-                });
+                // Update existing record's userId and set accessFlag to true
+                existingAccess.userId = userId;
+                existingAccess.accessFlag = true;
+            } else {
+                // Add new accessData entry with accessFlag set to true
+                userRecord.accessData.push({ userId, pinataHash, accessFlag: true });
             }
 
-            // If no duplicate, add new accessData entry
-            userRecord.accessData.push({ userId, pinataHash });
             const updatedRecord = await userRecord.save();
-
             res.status(201).send({
                 success: true,
                 message: "Access record updated successfully",
                 updatedRecord
             });
-        } else {    
-            // Create new access record if the email doesn't exist
+        } else {
+            // Create new access record with accessFlag set to true
             const newAccessRecord = new accessRecord({
                 email,
                 name,
-                accessData: [{ userId, pinataHash }]
+                accessData: [{ userId, pinataHash, accessFlag: true }]
             });
-
             const savedRecord = await newAccessRecord.save();
-
             res.status(201).send({
                 success: true,
                 message: "Access record created successfully",
@@ -60,7 +47,7 @@ export const shareAccess = async (req, res) => {
         res.status(500).send({
             success: false,
             message: "Error while creating access record",
-            error: error.message // Send error message for more detail
+            error
         });
     }
 };
@@ -82,10 +69,20 @@ export const getUser = async (req, res) => {
             });
         }
 
-        // Find the specific entry in accessData with the matching userId
-        const accessEntry = userRecord.accessData.find(entry => entry.userId === userId);
+        // Find the specific entry in accessData with the matching userId and accessFlag set to true
+        const accessEntry = userRecord.accessData.find(entry => entry.userId === userId && entry.accessFlag === true);
+
+        // If no accessEntry or accessFlag is false, deny access
+        if (!accessEntry) {
+            return res.status(403).send({
+                success: false,
+                message: "Access is denied or not found"
+            });
+        }
+
         const { pinataHash } = accessEntry;
 
+        // Fetch the file from the provided Pinata IPFS link
         const response = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}`, { responseType: 'arraybuffer' });
 
         const contentType = response.headers['content-type'];
@@ -99,17 +96,23 @@ export const getUser = async (req, res) => {
             const $ = cheerio.load(html);
             let pdfLinkText = null;
 
+            // Search for PDF links in the HTML
             $('a').each((index, element) => {
                 const link = $(element).attr('href');
                 if (link && link.endsWith('.pdf')) {
                     pdfLinkText = $(element).text();
-                    return false;
+                    return false;  // Stop after finding the first match
                 }
             });
 
-            const pdfData = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}/${pdfLinkText}`, { responseType: 'arraybuffer' });
-            res.set('Content-Type', 'application/pdf');
-            res.send(pdfData?.data);
+            // If a PDF link is found, fetch the PDF data
+            if (pdfLinkText) {
+                const pdfData = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}/${pdfLinkText}`, { responseType: 'arraybuffer' });
+                res.set('Content-Type', 'application/pdf');
+                res.send(pdfData?.data);
+            } else {
+                res.status(404).send({ message: "No PDF link found in HTML" });
+            }
         } else {
             res.status(415).send({ message: "Unsupported content type" });
         }
@@ -125,47 +128,37 @@ export const getUser = async (req, res) => {
 
 
 // Remove Access Record by updating userIds array
-export const updateUserIdForAccess = async (req, res) => {
+export const removeAccess = async (req, res) => {
     try {
-        const { email, pinataHash, updatedUserId } = req.body;
+        const { email, pinataHash, newUserId } = req.body;
 
-        // Step 1: Find user by email
-        const user = await accessRecord.findOne({ email });
-
-        if (!user) {
-            return res.status(404).send({
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        // Step 2: Find the correct accessData entry with the pinataHash
-        const accessDataEntry = user.accessData.find(
-            (entry) => entry.pinataHash === pinataHash
+        const updatedUser = await accessRecord.findOneAndUpdate(
+            { email, "accessData.pinataHash": pinataHash },
+            {
+                $set: {
+                    "accessData.$.userId": newUserId, // Update the userId for the matching pinataHash
+                    "accessData.$.accessFlag": false // Set accessFlag to false to revoke access
+                }
+            },
+            { new: true }
         );
 
-        if (!accessDataEntry) {
+        if (!updatedUser) {
             return res.status(404).send({
                 success: false,
-                message: "Pinata hash not found in access data"
+                message: "User or record not found"
             });
         }
 
-        // Step 3: Update the userId for the matched pinataHash
-        accessDataEntry.userId = updatedUserId;
-
-        // Step 4: Save the updated user record
-        await user.save();
-
-        res.status(200).send({
+        res.status(201).send({
             success: true,
-            message: "UserId updated successfully",
-            updatedUser: user
+            message: "Access removed successfully",
+            updatedUser
         });
     } catch (error) {
         res.status(500).send({
             success: false,
-            message: "Error while updating UserId",
+            message: "Error while removing access",
             error
         });
     }
@@ -203,21 +196,20 @@ export const deleteUser = async (req, res) => {
 // Get Record by Pinata Hash (URI)
 export const getRecordByURI = async (req, res) => {
     try {
-        const { pinataHash } = req.body;
-
-        // Find records where accessData contains the pinataHash
+        const { pinataHash } = req.params;
         const record = await accessRecord.find({
-            "accessData.pinataHash": pinataHash
+            "accessData.pinataHash": pinataHash,
+            "accessData.accessFlag": true // Only fetch records where accessFlag is true
         });
 
         if (!record || record.length === 0) {
             return res.status(404).send({
                 success: false,
-                message: "Record not found"
+                message: "Record not found or access is revoked"
             });
         }
 
-        res.status(200).send({
+        res.status(201).send({
             success: true,
             message: "Records retrieved",
             record
@@ -231,32 +223,4 @@ export const getRecordByURI = async (req, res) => {
     }
 };
 
-
-
-// Get User by Email
-export const getUserByEmail = async (req, res) => {
-    try {
-        const { email } = req.body;
-        const user = await accessRecord.findOne({ email });
-
-        if (!user) {
-            return res.status(404).send({
-                success: false,
-                message: "User not found"
-            });
-        }
-
-        res.status(200).send({
-            success: true,
-            message: "User found",
-            user
-        });
-    } catch (error) {
-        res.status(500).send({
-            success: false,
-            message: "Error while getting user by email",
-            error
-        });
-    }
-};
 
