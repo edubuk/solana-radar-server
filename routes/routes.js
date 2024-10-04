@@ -1,11 +1,12 @@
 import express from 'express';
-import {getRecordByURI, getUser, removeAccess, shareAccess} from '../controller/shareAccess.js'
+import {deleteUser, getRecordByURI, getUser, getUserByEmail, updateUserIdForAccess, shareAccess} from '../controller/shareAccess.js'
 
 const router = express.Router();
 
 router.post('/shareAccess',shareAccess);
 router.get('/getResponse/:userId',getUser);
-router.put('/removeAccess',removeAccess);
+router.put('/removeAccess',updateUserIdForAccess);
 router.get('/recordByUri',getRecordByURI);
-
+router.delete('/deleteUser',deleteUser);
+router.get("/getUser",getUserByEmail);
 export default router;
