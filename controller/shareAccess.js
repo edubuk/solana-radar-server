@@ -2,7 +2,7 @@ import accessRecord from '../modals/accessRecord.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 
-
+// share access of credential
 export const shareAccess = async (req, res) => {
     try {
         const { email, name, userId, pinataHash } = req.body;
@@ -87,11 +87,8 @@ export const getUser = async (req, res) => {
 
         const contentType = response.headers['content-type'];
 
-        // Check content type and handle accordingly (PDF or HTML)
-        if (contentType.includes('application/pdf')) {
-            res.set('Content-Type', 'application/pdf');
-            res.send(response.data);
-        } else if (contentType.includes('text/html')) {
+        // Check content type and handle accordingly (PDF, HTML, or Images)
+        if (contentType.includes('text/html')) {
             const html = response.data;
             const $ = cheerio.load(html);
             let pdfLinkText = null;
@@ -105,16 +102,39 @@ export const getUser = async (req, res) => {
                 }
             });
 
+            console.log(pdfLinkText);
+
             // If a PDF link is found, fetch the PDF data
             if (pdfLinkText) {
                 const pdfData = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}/${pdfLinkText}`, { responseType: 'arraybuffer' });
                 res.set('Content-Type', 'application/pdf');
                 res.send(pdfData?.data);
-            } else {
-                res.status(404).send({ message: "No PDF link found in HTML" });
             }
+        } else if (contentType.includes('application/pdf')) {
+            // Send the PDF content
+            console.log("PDF file detected");
+            res.set('Content-Type', 'application/pdf');
+            res.send(response.data);
+
+        } else if (contentType.includes('image/png') || contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
+            // Send the image content with correct content type
+            console.log("Image file detected", contentType);
+            const response = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}`, { responseType: 'arraybuffer' });
+
+            // Set proper headers for image
+            res.set({
+                'Content-Type': contentType,
+                'Content-Disposition': 'inline' // 'inline' allows the image to be displayed in the browser
+            });
+
+            res.send(Buffer.from(response.data, 'binary')); // Ensure binary data is sent properly
         } else {
-            res.status(415).send({ message: "Unsupported content type" });
+            // Default case: Handle other content types if necessary
+            console.log("Unsupported content type", contentType);
+            res.status(415).send({
+                success: false,
+                message: "Unsupported content type"
+            });
         }
 
     } catch (error) {
@@ -125,6 +145,7 @@ export const getUser = async (req, res) => {
         });
     }
 };
+
 
 
 // Remove Access Record by updating userIds array
@@ -193,7 +214,7 @@ export const deleteUser = async (req, res) => {
 };
 
 
-// Get Record by Pinata Hash (URI)
+// Get Record by Pinata Hash (CID)
 export const getRecordByURI = async (req, res) => {
     try {
         const { pinataHash } = req.params;
@@ -223,4 +244,69 @@ export const getRecordByURI = async (req, res) => {
     }
 };
 
+// Get Document by Pinata Hash (CID)
+export const getDocByUri = async (req, res) => {
+    try {
+        const { pinataHash } = req.params;
+
+        // Fetch the file from the provided Pinata IPFS link
+        const response = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}`, { responseType: 'arraybuffer' });
+
+        const contentType = response.headers['content-type'];
+
+        // Check content type and handle accordingly (PDF, HTML, or Images)
+        if (contentType.includes('text/html')) {
+            const html = response.data;
+            const $ = cheerio.load(html);
+            let pdfLinkText = null;
+
+            // Search for PDF links in the HTML
+            $('a').each((index, element) => {
+                const link = $(element).attr('href');
+                if (link && link.endsWith('.pdf')) {
+                    pdfLinkText = $(element).text();
+                    return false;  // Stop after finding the first match
+                }
+            });
+
+            console.log(pdfLinkText);
+
+            // If a PDF link is found, fetch the PDF data
+            if (pdfLinkText) {
+                const pdfData = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}/${pdfLinkText}`, { responseType: 'arraybuffer' });
+                res.set('Content-Type', 'application/pdf');
+                res.send(pdfData?.data);
+            }
+        } else if (contentType.includes('application/pdf')) {
+            // Send the PDF content
+            console.log("PDF file detected");
+            res.set('Content-Type', 'application/pdf');
+            res.send(response.data);
+
+        } else if (contentType.includes('image/png') || contentType.includes('image/jpeg') || contentType.includes('image/jpg')) {
+            const response = await axios.get(`https://red-traditional-hookworm-447.mypinata.cloud/ipfs/${pinataHash}`, { responseType: 'arraybuffer' });
+
+            res.set({
+                'Content-Type': contentType,
+                'Content-Disposition': 'inline' // 'inline' allows the image to be displayed in the browser
+            });
+
+            res.send(Buffer.from(response.data, 'binary')); 
+        } else {
+            // Default case: Handle other content types if necessary
+            console.log("Unsupported content type", contentType);
+            res.status(415).send({
+                success: false,
+                message: "Unsupported content type"
+            });
+        }
+
+    } catch (error) {
+        res.status(500).send({
+            success: false,
+            message: "Error while getting user data",
+            error
+        });
+    }
+};
 
