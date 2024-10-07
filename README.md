@@ -1,11 +1,6 @@
 # Solana-Radar-Hackathon (Sept. - Oct. 2024)
 ## Backend code of Edubuk's dApp integrated with Solana Blockchain (Devnet)
 
-This repository contains the implementation of Edubuk's Rust-based smart contract on the Solana blockchain, developed using the Anchor framework. The smart contract is designed to securely manage and verify digital certificate records on the blockchain, providing an efficient solution for e-Sealing and verifying educational and professional certificates.
-
-**Project Overview**
-The core objective of this smart contract is to securely store and manage digital certificates on the Solana blockchain. It records essential certificate information, including details about the issuer, recipient, certificate type, and a unique file hash, along with a timestamp and the transaction initiator's public key. This allows universities, employers, and other entities to digitally register and verify certificates, enhancing trust and transparency in digital transactions. This project can handle single certificate upload, and bulk (upto 100 in one go as one transaction, which can be expanded further) certificates upload as well.
-
 **1. Backend Functionality**
 Overview: This backend code provides APIs for managing and accessing digital credentials using IPFS and a MongoDB database. It supports sharing access, verifying credentials, removing access, deleting users, and retrieving files from IPFS.
 
