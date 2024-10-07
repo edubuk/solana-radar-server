@@ -5,6 +5,75 @@ This repository contains the implementation of Edubuk's Rust-based smart contrac
 **Project Overview**
 The core objective of this smart contract is to securely store and manage digital certificates on the Solana blockchain. It records essential certificate information, including details about the issuer, recipient, certificate type, and a unique file hash, along with a timestamp and the transaction initiator's public key. This allows universities, employers, and other entities to digitally register and verify certificates, enhancing trust and transparency in digital transactions. This project can handle single certificate upload, and bulk (upto 100 in one go as one transaction, which can be expanded further) certificates upload as well.
 
+**1. Backend Functionality**
+Overview: This backend code provides APIs for managing and accessing digital credentials using IPFS and a MongoDB database. It supports sharing access, verifying credentials, removing access, deleting users, and retrieving files from IPFS.
+
+**Key Libraries Used:**
+axios: Used for making HTTP requests to the Pinata IPFS service.
+cheerio: Used to parse and manipulate HTML content retrieved from IPFS.
+mongoose: Used to interact with MongoDB for storing and managing access records.
+
+**2. API Endpoints**
+
+1. shareAccess
+
+Method: POST
+Description: Shares access to a digital credential. If the user already has access to the specified certificate (pinataHash), it updates the user ID and sets the access flag to true. Otherwise, it adds a new access entry.
+Parameters:
+email: The email address of the user.
+name: Name of the user.
+userId: Unique identifier for the user.
+pinataHash: The IPFS hash of the certificate.
+Response: Creates or updates the access record in the database.
+
+2. getUser
+Method: GET
+Description: Retrieves a user's access record by their user ID. It fetches the file from the IPFS if the access flag is set to true.
+Parameters:
+userId: User ID to identify the access record.
+Response: Returns the user's certificate if access is granted and the file exists.
+
+3. removeAccess
+Method: PUT
+Description: Removes access to a specific certificate by updating the accessFlag to false and changing the userId.
+Parameters:
+email: Email of the user whose access is being revoked.
+pinataHash: The IPFS hash of the certificate.
+newUserId: New user ID to be set.
+Response: Updates the access record in the database.
+
+4. deleteUser
+Method: DELETE
+Description: Deletes a user's access record entirely from the database.
+Parameters:
+email: Email of the user to be deleted.
+Response: Deletes the user's record from the database.
+
+5. getRecordByURI
+Method: GET
+Description: Retrieves access records associated with a specific IPFS hash (pinataHash). Only records with an active accessFlag are returned.
+Parameters:
+pinataHash: The IPFS hash of the certificate.
+Response: Returns the access record if it exists and access is granted.
+
+6. getDocByUri
+Method: GET
+Description: Fetches a document from IPFS using the provided pinataHash. It supports various content types (HTML, PDF, images) and sends them as a response.
+Parameters:
+pinataHash: The IPFS hash of the document.
+Response: Returns the document content based on its type.
+
+**3. Prerequisites**
+Node.js installed on the machine.
+MongoDB set up and running.
+An account on Pinata to store files on IPFS.
+
+**4. Environment Variables**
+Add the following environment variables in a .env file:
+
+MONGODB_URI: URI to connect to MongoDB.
+PINATA_API_KEY and PINATA_API_SECRET: Pinata API keys for IPFS access.
+
 **There are 4 stakeholders as mentioned in the diagram below:**
 
 1.) Issuer: University or Employer who issues the academic certificate or Work-Experience certificate.
