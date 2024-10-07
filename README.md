@@ -1,4 +1,5 @@
-**Backend code of Edubuk's dApp integrated with Solana Blockchain (Devnet)**
+# Solana-Radar-Hackathon (Sept. - Oct. 2024)
+## Backend code of Edubuk's dApp integrated with Solana Blockchain (Devnet)
 
 This repository contains the implementation of Edubuk's Rust-based smart contract on the Solana blockchain, developed using the Anchor framework. The smart contract is designed to securely manage and verify digital certificate records on the blockchain, providing an efficient solution for e-Sealing and verifying educational and professional certificates.
 
